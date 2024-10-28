@@ -57,7 +57,7 @@ async def process_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if link_type == "YouTube":
         action_buttons = [['Конвертировать в MP3'], ['Скачать видео'], ['Назад']]
     elif link_type == "VK":
-        action_buttons = [['Скачать VK Клип'], ['Назад']]
+        action_buttons = [['скачать VK Видео/Клип'], ['Назад']]
     else:
         await update.message.reply_text("Неподдерживаемый URL. Пожалуйста, отправьте ссылку на YouTube или VK.")
         return START
@@ -96,8 +96,8 @@ async def handle_action_selection(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text('Выберите качество видео:', reply_markup=markup_quality)
         return SELECT_QUALITY
 
-    elif action == 'скачать vk клип' and link_type == "VK":
-        await update.message.reply_text("Загрузка VK Клипа началась...")
+    elif action == 'скачать vk видео/клип' and link_type == "VK":
+        await update.message.reply_text("Загрузка VK Видео/Клипа началась...")
         vk_file_path, title = await asyncio.to_thread(download_vk_clip, url, update.message.from_user.id)
         await send_file(update, vk_file_path, title, 'video')
         return PROCESS
@@ -199,7 +199,7 @@ def download_vk_clip(url, user_id):
 
 # Основная функция
 def main():
-    token = ('Your_Bot_key')
+    token = ('Your_bot_token')
     bot = Bot(token=token)
     application = ApplicationBuilder().bot(bot).build()
 
