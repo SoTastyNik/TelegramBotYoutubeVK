@@ -4,7 +4,9 @@ import asyncio
 from telegram import Update, ReplyKeyboardMarkup, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ConversationHandler, ContextTypes, filters
 import yt_dlp
+from dotenv import load
 
+load()
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -199,7 +201,7 @@ def download_vk_clip(url, user_id):
 
 # Основная функция
 def main():
-    token = ('Your_bot_token')
+    token = os.getenv('TOKEN')
     bot = Bot(token=token)
     application = ApplicationBuilder().bot(bot).build()
 
