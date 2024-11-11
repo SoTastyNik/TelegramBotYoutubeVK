@@ -17,7 +17,7 @@ MAX_TELEGRAM_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2ГБ
 TELEGRAM_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50МБ
 
 # Состояния для диалога
-START, GET_URL, PROCESS, SELECT_QUALITY, END = range(5)
+START, GET_URL, PROCESS, SELECT_QUALITY,SELECT_QUALITY_VK, END = range(6)
 
 # Клавиатура для выбора начального действия
 reply_keyboard_start = [['Отправить Ссылку'], ['Отмена']]
@@ -93,7 +93,7 @@ async def handle_action_selection(update: Update, context: ContextTypes.DEFAULT_
 
         context.user_data['available_qualities'] = available_qualities
         await update.message.reply_text('Выберите качество для VK Истории:', reply_markup=markup_quality)
-        return SELECT_QUALITY
+        return SELECT_QUALITY_VK
 
     elif action == 'скачать vk видео/клип' and link_type == "VK_VIDEO_CLIP":
         await update.message.reply_text("Загрузка VK Видео/Клипа началась...")
@@ -150,6 +150,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         await update.message.reply_text("Выберите доступную опцию.", reply_markup=markup_start)
         return START
+
+
+async def handle_quality_selection_VK(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    selection = update.message.text.strip()
+    if selection.lower() == 'назад':
+        return await process_url(update, context)
+
+    formats = context.user_data.get('formats')
+
+    # Проверка наличия форматов
+    if formats is None:
+        await update.message.reply_text("Не удалось получить доступные качества для видео. Попробуйте снова.",
+                                        reply_markup=markup_start)
+        return PROCESS
+
+    # Поиск выбранного формата в списке доступных форматов
+    selected_format = next((f for f in formats if f"{f['resolution']} - {f['ext']}" == selection), None)
+    if selected_format:
+        await update.message.reply_text(
+            f"Вы выбрали качество: {selected_format['resolution']} {selected_format['ext']}. Видео загружается..."
+        )
+        video_file_path, title = await asyncio.to_thread(
+            download_video_with_quality, context.user_data.get('url'), selected_format, update.message.from_user.id
+        )
+        await send_file(update, video_file_path, title, 'video')
+        return PROCESS
+    else:
+        await update.message.reply_text("Неверный выбор, попробуйте еще раз.", reply_markup=markup_start)
+        return SELECT_QUALITY_VK
 
 
 # Функция отправки файла с проверкой типа
@@ -255,6 +284,7 @@ def main():
                 GET_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_url)],
                 PROCESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_action_selection)],
                 SELECT_QUALITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quality_selection)],
+                SELECT_QUALITY_VK: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quality_selection)],
             },
             fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, stop_conversation)],
         )
