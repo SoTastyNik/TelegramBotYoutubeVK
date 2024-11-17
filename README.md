@@ -1,6 +1,8 @@
 # TelegramBotYoutubeVK
 This is the bot, which can download videos from YT and convert them to MP3. Also it can download VK Videos and Clips and Stories without watermarks
 
+Bot works with SQlite3 db now
+
 Этот код представляет собой бота для Telegram, который позволяет пользователям загружать видео и аудио с YouTube и VK, выбирая различные форматы и качество. Он использует библиотеки `telegram`, `telegram.ext`, `yt_dlp`, `os`, `logging`, и `asyncio` для обработки запросов, скачивания медиа и организации процесса загрузки.
 
 ### Обзор используемых библиотек
