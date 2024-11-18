@@ -7,7 +7,7 @@ import yt_dlp
 import requests
 import sqlite3
 from dotenv import load
-from datetime import datetime
+
 
 load()
 
