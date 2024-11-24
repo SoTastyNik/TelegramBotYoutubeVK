@@ -6,10 +6,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 import yt_dlp
 import requests
 import sqlite3
-from dotenv import load
+from dotenv import load_dotenv
 
 
-load()
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
