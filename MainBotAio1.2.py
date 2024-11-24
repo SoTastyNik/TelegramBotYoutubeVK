@@ -97,6 +97,29 @@ def save_user(user_id, username, last_url=None, last_action=None):
     conn.commit()
     conn.close()
 
+def log_action(user_id, url, action):
+    conn = sqlite3.connect("telegram_bot.db")
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO logs (user_id, url, action)
+        VALUES (?, ?, ?)
+    ''', (user_id, url, action))
+
+    conn.commit()
+    conn.close()
+
+def save_download(user_id, file_path, file_type):
+    conn = sqlite3.connect("telegram_bot.db")
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO downloads (user_id, file_path, file_type)
+        VALUES (?, ?, ?)
+    ''', (user_id, file_path, file_type))
+
+    conn.commit()
+    conn.close()
 
 # Функция скачивания музыки с VK
 def download_vk_music(url, user_id):
@@ -173,6 +196,7 @@ async def process_url_handler(message: types.Message, state: FSMContext):
 
     # Сохраняем пользователя и ссылку в базу данных
     save_user(user_id, username, last_url=url, last_action="Получен URL")
+    log_action(user_id, url=url, action="Получен URL")
 
     # Распознаем тип ссылки
     link_type = detect_link_type(url)
@@ -380,6 +404,7 @@ async def download_video_with_quality(url, selected_format, user_id):
         info = ydl.extract_info(url, download=True)
         file_path = f"{user_id}_video.{selected_format['ext']}"
         title = info.get('title', 'Untitled')
+        save_download(user_id, file_path, 'video')
         return file_path, title
 
 
@@ -394,6 +419,7 @@ async def download_audio(url, user_id):
         info = ydl.extract_info(url, download=True)
         file_path = f"{user_id}_audio.mp3"
         title = info.get('title', 'Untitled')
+        save_download(user_id, file_path, 'audio')
         return file_path, title
 
 
