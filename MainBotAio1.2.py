@@ -157,7 +157,7 @@ def search_vk_music(keywords):
 
 
 
-# Хэндлер команды /start
+# Хэндлер старта
 @dp.message(Command("start","начать"))
 async def start_command(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
