@@ -12,6 +12,7 @@ from aiogram.types import FSInputFile
 from dotenv import load_dotenv
 import yt_dlp
 
+
 load_dotenv()
 
 # Настройка логирования
@@ -33,8 +34,7 @@ class UserStates(StatesGroup):
     PROCESS = State()
     SELECT_QUALITY = State()
     SELECT_QUALITY_VK = State()
-    SEARCH_MUSIC = State()
-    DOWNLOAD_MUSIC = State()
+    SEARCH_VIDEO = State()
 
 # Инициализация базы данных
 def init_db():
@@ -121,44 +121,8 @@ def save_download(user_id, file_path, file_type):
     conn.commit()
     conn.close()
 
-# Функция скачивания музыки с VK
-def download_vk_music(url, user_id):
-    params = {'v': '5.131', 'access_token': os.getenv("VK_ACCESS_TOKEN")}
-    audio_id = url.split("audio")[1]
-    response = requests.post(f"https://api.vk.com/method/audio.getById?audios={audio_id}", params=params)
-    audio_data = response.json()
-
-    if "response" in audio_data:
-        audio_url = audio_data['response'][0]['url']
-        file_path = f"{user_id}_vk_music.mp3"
-        with open(file_path, 'wb') as file:
-            response = requests.get(audio_url, stream=True)
-            for chunk in response.iter_content(1024):
-                file.write(chunk)
-        return file_path, audio_data['response'][0]['title']
-    else:
-        raise ValueError("Не удалось получить доступ к аудио.")
-
-
-# Функция поиска музыки по ключевым словам
-def search_vk_music(keywords):
-    params = {
-        'q': keywords,
-        'access_token': os.getenv('VK_ACCESS_TOKEN'),
-        'v': '5.131',
-        'count': 5
-    }
-    response = requests.get('https://api.vk.com/method/audio.search', params=params).json()
-    if "response" in response:
-        return [{"title": item['title'], "artist": item['artist']} for item in response['response']['items']]
-    return []
-
-
-
-
-
 # Хэндлер старта
-@dp.message(Command("start","начать"))
+@dp.message(Command("start","начать","дарова"))
 async def start_command(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username or "Unknown"
@@ -185,6 +149,8 @@ def detect_link_type(url):
         return "VK_VIDEO_CLIP"
     elif "vk.com/story" in url:
         return "VK_STORY"
+    elif "rutube.ru" in url:
+        return "Rutube"
     return None
 
 
@@ -207,7 +173,7 @@ async def process_url_handler(message: types.Message, state: FSMContext):
         keyboard = ReplyKeyboardMarkup(
             keyboard=[
                 [types.KeyboardButton(text="Скачать видео")],
-                [types.KeyboardButton(text="Скачать аудио")],
+                [types.KeyboardButton(text="Скачать MP3")],
                 [types.KeyboardButton(text="Назад")]
             ],
             resize_keyboard=True
@@ -248,6 +214,17 @@ async def process_url_handler(message: types.Message, state: FSMContext):
         await message.answer("Выберите действие:", reply_markup=keyboard)
         await state.update_data(url=url, link_type="VK_AUDIO")
         await state.set_state(UserStates.PROCESS)
+    elif link_type == "Rutube":
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[
+                    [types.KeyboardButton(text="Скачать видео с Rutube")],
+                    [types.KeyboardButton(text="Назад")]
+                ],
+                resize_keyboard=True
+            )
+            await message.answer("Выберите действие:", reply_markup=keyboard)
+            await state.update_data(url=url, link_type="Rutube")
+            await state.set_state(UserStates.PROCESS)
     else:
         # Если ссылка не распознана
         await message.answer("Неподдерживаемый URL. Пожалуйста, отправьте корректный URL.")
@@ -260,14 +237,8 @@ async def handle_text(message: types.Message, state: FSMContext):
     text = message.text.lower()
 
     if text == "отправить ссылку":
-        await message.answer("Пожалуйста, отправьте ссылку YouTube или VK URL:")
+        await message.answer("Пожалуйста, отправьте ссылку YouTube, VK URL или Rutube:")
         await state.set_state(UserStates.GET_URL)
-    elif text == "найти музыку":
-        await message.answer("Введите ключевые слова для поиска музыки:")
-        await state.set_state(UserStates.SEARCH_MUSIC)
-    elif text == "скачать музыку по ссылке":
-        await message.answer("Отправьте ссылку на VK аудио:")
-        await state.set_state(UserStates.DOWNLOAD_MUSIC)
     elif text == "отмена":
         await message.answer("До скорых встреч!", reply_markup=types.ReplyKeyboardRemove())
         await state.clear()
@@ -275,42 +246,11 @@ async def handle_text(message: types.Message, state: FSMContext):
         await message.answer("Выберите доступную опцию:", reply_markup=main_menu_keyboard())
 
 
-# Обработчик поиска музыки
-@dp.message(UserStates.SEARCH_MUSIC)
-async def search_music_handler(message: types.Message, state: FSMContext):
-    keywords = message.text.strip()
-    results = search_vk_music(keywords)
-    if results:
-        response = "\n".join([f"{idx + 1}. {r['artist']} - {r['title']}" for idx, r in enumerate(results)])
-        await message.answer(f"Результаты поиска:\n{response}")
-    else:
-        await message.answer("Ничего не найдено.")
-    await state.set_state(UserStates.START)
-
-
-# Обработчик скачивания музыки
-@dp.message(UserStates.DOWNLOAD_MUSIC)
-async def download_music_handler(message: types.Message, state: FSMContext):
-    url = message.text.strip()
-    user_id = message.from_user.id
-    try:
-        file_path, title = download_vk_music(url, user_id)
-        with open(file_path, 'rb') as file:
-            await message.answer_document(file)
-        os.remove(file_path)
-    except ValueError as e:
-        await message.answer(str(e))
-    await state.set_state(UserStates.START)
-
-
-
-
 # Получение URL от пользователя
 @dp.message(UserStates.GET_URL)
 async def get_url_handler(message: types.Message, state: FSMContext):
     await message.answer("Пожалуйста, отправьте ссылку YouTube или VK URL:")
     await state.set_state(UserStates.GET_URL)
-
 
 # Обработчик выбора действия (загрузка видео/аудио, конвертация)
 @dp.message(UserStates.PROCESS)
@@ -326,16 +266,19 @@ async def handle_action_selection(message: types.Message, state: FSMContext):
             await message.answer("Не удалось получить доступные качества для видео. Попробуйте снова.")
             await state.set_state(UserStates.START)
             return
-
         # Генерация клавиатуры с выбором качества
         keyboard = ReplyKeyboardMarkup(
             keyboard=[[types.KeyboardButton(text=f"{f['resolution']} - {f['ext']}")] for f in formats] +
                      [[types.KeyboardButton(text="Назад")]],
             resize_keyboard=True
         )
+        if action == "Назад":
+            await message.answer("Возврат в главное меню.", reply_markup=keyboard)
+            await state.set_state(UserStates.START)
         await message.answer("Выберите качество видео:", reply_markup=keyboard)
         await state.update_data(formats=formats)
         await state.set_state(UserStates.SELECT_QUALITY)
+
     elif action == "скачать аудио" and link_type == "YouTube":
         file_path, title = await download_audio(url, message.from_user.id)
         await send_file(message, file_path, title, file_type="audio")
@@ -346,11 +289,16 @@ async def handle_action_selection(message: types.Message, state: FSMContext):
         await state.set_state(UserStates.START)
     elif action == "скачать vk историю" and link_type == "VK_STORY":
         file_path, _ = await download_vk_history(url, message.from_user.id)
-        await send_file(message, file_path, "VK Story", file_type="video")
+        await send_file(message, file_path, "VK: " + url, file_type="video")
         await state.set_state(UserStates.START)
     elif action == "скачать vk аудио" and link_type == "VK_AUDIO":
-        file_path, title = await download_vk_music(url, message.from_user.id)
-        await send_file(message, file_path, title, file_type="audio")
+        file_path, title = 0
+        await send_file(message, file_path, "VK Music", file_type="audio")
+        await state.set_state(UserStates.START)
+    elif action == "скачать видео с rutube" and link_type == "Rutube":
+        await message.answer("Видео загружается...")
+        file_path, title = await download_rutube_video(url, message.from_user.id)
+        await send_file(message, file_path, title, file_type="video")
         await state.set_state(UserStates.START)
     elif action == "назад":
         await message.answer("Возврат в главное меню.", reply_markup=main_menu_keyboard())
@@ -359,6 +307,25 @@ async def handle_action_selection(message: types.Message, state: FSMContext):
         await message.answer("Неподдерживаемое действие. Попробуйте снова.")
 
 
+async def download_rutube_video(url, user_id):
+    """
+    Загружает видео с Rutube с использованием yt-dlp.
+
+    :param url: Ссылка на видео.
+    :param user_id: ID пользователя.
+    :return: Путь к видеофайлу и название видео.
+    """
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': f'{user_id}_rutube.%(ext)s',
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        file_path = f"{user_id}_rutube.{info['ext']}"
+        title = info.get("title", "Rutube Video")
+        save_download(user_id, file_path, 'video')  # Сохранение информации о загрузке в БД
+        return file_path, title
 
 # Обработчик выбора качества видео
 @dp.message(UserStates.SELECT_QUALITY)
@@ -393,8 +360,6 @@ async def handle_quality_selection_vk(message: types.Message, state: FSMContext)
     else:
         await message.answer("Неверный выбор. Попробуйте снова.")
 
-
-# Загрузка видео с выбранным качеством
 async def download_video_with_quality(url, selected_format, user_id):
     ydl_opts = {
         'format': selected_format['format_id'],
@@ -407,6 +372,14 @@ async def download_video_with_quality(url, selected_format, user_id):
         save_download(user_id, file_path, 'video')
         return file_path, title
 
+
+async def get_available_formats(url):
+    ydl_opts = {'listformats': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        formats = [f for f in info.get('formats', []) if f.get('acodec') != 'none' and f.get('vcodec') != 'none']
+        return [{'format_id': f['format_id'], 'resolution': f.get('resolution', 'audio'), 'ext': f['ext']} for f in
+                formats]
 
 # Загрузка аудио в формате MP3
 async def download_audio(url, user_id):
@@ -446,12 +419,33 @@ async def download_vk_content(url, user_id):
 
 
 # Получение доступных форматов видео
-async def get_available_formats(url):
+
+async def get_available_formats1(url):
     ydl_opts = {'listformats': True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         formats = [f for f in info.get('formats', []) if f.get('acodec') != 'none' and f.get('vcodec') != 'none']
         return [{'format_id': f['format_id'], 'resolution': f.get('resolution', 'audio'), 'ext': f['ext']} for f in formats]
+
+async def search_youtube_videos(query: str):
+    """
+    Выполняет поиск на YouTube и возвращает список найденных видео.
+
+    :param query: Запрос для поиска
+    :return: Список словарей с информацией о найденных видео
+    """
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'extract_flat': True,
+        'default_search': 'ytsearch',  # Указываем, что ищем на YouTube
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        results = ydl.extract_info(query, download=False)
+        if "entries" in results:
+            videos = results["entries"][:1]  # Возвращаем только первые 5 видео
+            return [{"title": video.get("title"), "url": video.get("url")} for video in videos]
+    return []
 
 
 # Загрузка VK истории с выбором качества
