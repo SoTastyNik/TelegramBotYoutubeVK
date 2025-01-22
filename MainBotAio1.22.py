@@ -21,12 +21,16 @@ load_dotenv()
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
+# dev-сообщение
+dev_contact_message = "Пожалуйста, отправьте описание вашей проблемы. Разработчик получит ваше сообщение."
+
 # Константы
 MAX_TELEGRAM_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2ГБ
 TELEGRAM_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50МБ
 
 # Инициализация бота
 TOKEN = os.getenv("TOKEN")
+DEV_ID = os.getenv("DEV_ID")
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -38,6 +42,7 @@ class UserStates(StatesGroup):
     SELECT_QUALITY = State()
     SELECT_QUALITY_VK = State()
     SEARCH_VIDEO = State()
+    CONTACT_DEV = State()
 
 # Инициализация базы данных
 def init_db():
@@ -133,11 +138,13 @@ async def start_command(message: types.Message, state: FSMContext):
     await message.answer("Добро пожаловать! Выберите опцию:", reply_markup=main_menu_keyboard())
     await state.set_state(UserStates.START)
 
+
 # Клавиатуры
 def main_menu_keyboard():
     # Создаем кнопки
     buttons = [
         [KeyboardButton(text="Отправить ссылку 🔗")],
+        [KeyboardButton(text="Написать разработчику 🛠")],
         [KeyboardButton(text="Отмена ❌")]
     ]
     # Передаем кнопки в параметр keyboard
@@ -261,12 +268,30 @@ async def handle_text(message: types.Message, state: FSMContext):
     elif text == "скачать ещё что-нибудь 📩":
         await message.answer("Пожалуйста, отправьте новую ссылку 🔗.")
         await state.set_state(UserStates.GET_URL)
+    elif message.text == "Написать разработчику 🛠":
+        await message.answer(dev_contact_message)
+        await state.set_state(UserStates.CONTACT_DEV)
     elif text == "отмена ❌":
         await message.answer("До скорых встреч! ❤️", reply_markup=types.ReplyKeyboardRemove())
         await state.clear()
     else:
         await message.answer("Выберите доступную опцию 💾:", reply_markup=main_menu_keyboard())
 
+# Хэндлер отправки сообщения разработчику
+@dp.message(UserStates.CONTACT_DEV)
+async def contact_dev_handler(message: types.Message, state: FSMContext):
+    if message.text == "Отмена ❌":
+        await message.answer("Обращение отменено.", reply_markup=main_menu_keyboard())
+        await state.set_state(UserStates.START)
+    else:
+        try:
+            await bot.send_message(DEV_ID, f"Сообщение от {message.from_user.username or message.from_user.id}:\n{message.text}")
+            await message.answer("Ваше сообщение успешно отправлено разработчику. ✅", reply_markup=main_menu_keyboard())
+            await state.set_state(UserStates.START)
+        except Exception as e:
+            logging.error(f"Ошибка отправки сообщения разработчику: {e}")
+            await message.answer("Не удалось отправить сообщение разработчику. Попробуйте позже.", reply_markup=main_menu_keyboard())
+            await state.set_state(UserStates.START)
 
 # Получение URL от пользователя
 @dp.message(UserStates.GET_URL)
