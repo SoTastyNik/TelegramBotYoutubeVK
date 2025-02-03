@@ -48,7 +48,7 @@ class UserStates(StatesGroup):
 
 # Инициализация базы данных
 def init_db():
-    conn = sqlite3.connect("telegram_bot.db")
+    conn = sqlite3.connect("../telegram_bot.db")
     cursor = conn.cursor()
 
     # Таблица для пользователей
@@ -91,7 +91,7 @@ def init_db():
 
 # Функция добавления пользователя в БД
 def save_user(user_id, username, last_url=None, last_action=None):
-    conn = sqlite3.connect("telegram_bot.db")
+    conn = sqlite3.connect("../telegram_bot.db")
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -108,7 +108,7 @@ def save_user(user_id, username, last_url=None, last_action=None):
     conn.close()
 
 def log_action(user_id, url, action):
-    conn = sqlite3.connect("telegram_bot.db")
+    conn = sqlite3.connect("../telegram_bot.db")
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -120,7 +120,7 @@ def log_action(user_id, url, action):
     conn.close()
 
 def save_download(user_id, file_path, file_type):
-    conn = sqlite3.connect("telegram_bot.db")
+    conn = sqlite3.connect("../telegram_bot.db")
     cursor = conn.cursor()
 
     cursor.execute('''
